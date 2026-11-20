@@ -1,6 +1,9 @@
 import { async, ComponentFixture, TestBed } from '@angular/core/testing';
+import { ActivatedRoute, convertToParamMap } from '@angular/router';
+import { RouterTestingModule } from '@angular/router/testing';
 
 import { LogoutComponent } from './logout.component';
+import { LogoutActions } from '../api-authorization.constants';
 
 describe('LogoutComponent', () => {
   let component: LogoutComponent;
@@ -8,7 +11,20 @@ describe('LogoutComponent', () => {
 
   beforeEach(async(() => {
     TestBed.configureTestingModule({
-      declarations: [ LogoutComponent ]
+      imports: [RouterTestingModule],
+      declarations: [ LogoutComponent ],
+      providers: [
+        {
+          provide: ActivatedRoute,
+          useValue: {
+            snapshot: {
+              url: [{ path: 'authentication' }, { path: LogoutActions.LoggedOut }],
+              queryParams: {},
+              queryParamMap: convertToParamMap({})
+            }
+          }
+        }
+      ]
     })
     .compileComponents();
   }));
