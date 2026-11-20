@@ -1,9 +1,9 @@
 ﻿using CleanArchitecture.Application.Common.Exceptions;
 using Microsoft.AspNetCore.Builder;
 using Microsoft.AspNetCore.Http;
-using Newtonsoft.Json;
+using Microsoft.AspNetCore.Mvc;
 using System;
-using System.Net;
+using System.Text.Json;
 using System.Threading.Tasks;
 
 namespace CleanArchitecture.WebUI.Common
@@ -31,28 +31,44 @@ namespace CleanArchitecture.WebUI.Common
 
         private Task HandleExceptionAsync(HttpContext context, Exception exception)
         {
-            var code = HttpStatusCode.InternalServerError;
-
-            var result = string.Empty;
+            ProblemDetails problem;
 
             switch (exception)
             {
                 case ValidationException validationException:
-                    code = HttpStatusCode.BadRequest;
-                    result = JsonConvert.SerializeObject(validationException.Failures);
+                    problem = new ValidationProblemDetails(validationException.Failures)
+                    {
+                        Type = "https://tools.ietf.org/html/rfc7231#section-6.5.1",
+                        Title = "One or more validation errors occurred.",
+                        Status = StatusCodes.Status400BadRequest,
+                    };
                     break;
                 case NotFoundException _:
-                    code = HttpStatusCode.NotFound;
+                    problem = new ProblemDetails
+                    {
+                        Type = "https://tools.ietf.org/html/rfc7231#section-6.5.4",
+                        Title = "The specified resource was not found.",
+                        Status = StatusCodes.Status404NotFound,
+                        Detail = exception.Message,
+                    };
+                    break;
+                default:
+                    problem = new ProblemDetails
+                    {
+                        Type = "https://tools.ietf.org/html/rfc7231#section-6.6.1",
+                        Title = "An error occurred while processing your request.",
+                        Status = StatusCodes.Status500InternalServerError,
+                    };
                     break;
             }
 
-            context.Response.ContentType = "application/json";
-            context.Response.StatusCode = (int)code;
+            context.Response.ContentType = "application/problem+json";
+            context.Response.StatusCode = problem.Status.Value;
 
-            if (string.IsNullOrEmpty(result))
-            {
-                result = JsonConvert.SerializeObject(new { error = exception.Message });
-            }
+            var result = JsonSerializer.Serialize(
+                problem,
+                problem.GetType(),
+                new JsonSerializerOptions { IgnoreNullValues = true });
 
             return context.Response.WriteAsync(result);
         }
