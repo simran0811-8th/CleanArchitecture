@@ -1,8 +1,185 @@
 <h1>Todo</h1>
 
-<p>This is a <span class="text-danger">broken</span> todo list component.</p>
+<p>This is a complex todo list component.</p>
 
-<div class="alert alert-danger">
-  <strong>Sorry!</strong><br />
-  This component was completely broken after upgrade to Angular 13 and needs to be rebuilt.
+<div id="todo-error" class="alert alert-danger" *ngIf="errorMessage">
+  <strong>Error:</strong>
+  <span id="todo-error-text">{{ errorMessage }}</span>
+</div>
+
+<p *ngIf="!vm"><em>Loading...</em></p>
+
+<div class="row" *ngIf="vm">
+  <div class="col-sm-4">
+    <div class="clearfix">
+      <h2 class="float-start">Lists</h2>
+      <button id="addListButton" class="btn btn-default float-end" title="Add List..." (click)="showNewListModal()">Add List...</button>
+    </div>
+    <ul id="todo-lists" class="list-group">
+      <li class="list-group-item" *ngFor="let list of vm.lists ?? []" [class.active]="list === selectedList" (click)="selectedList = list">
+        <div class="clearfix">
+          <div class="float-start list-title">{{ list.title }}</div>
+          <div class="float-end text-right">
+            <span class="badge bg-light text-dark list-remaining">{{ remainingItems(list) }}</span>
+          </div>
+        </div>
+      </li>
+    </ul>
+  </div>
+
+  <div class="col-sm-8" id="selected-list-col" *ngIf="selectedList">
+    <div class="clearfix">
+      <h2 class="float-start" id="selected-list-title">{{ selectedList.title }}</h2>
+      <button id="listOptions" class="btn btn-default float-end" title="List Options..." (click)="showListOptionsModal()">List Options...</button>
+    </div>
+    <ul id="todo-items" class="list-group mb-2">
+      <li class="list-group-item" *ngFor="let item of selectedList.items ?? []; let i = index">
+        <div class="d-flex">
+          <div class="todo-item-checkbox">
+            <input type="checkbox" [checked]="!!item.done" (change)="item.done = $any($event.target).checked; toggleDone(item)" />
+          </div>
+          <div class="flex-fill">
+            <input *ngIf="item === selectedItem" id="{{ 'itemTitle' + i }}" type="text"
+                   class="form-control item-input-control item-title-input" maxlength="200"
+                   [(ngModel)]="item.title" (keyup.enter)="updateItem(item, true)" (blur)="updateItem(item)" />
+            <div *ngIf="item !== selectedItem" class="todo-item-title form-control item-input-control"
+                 [class.done-todo]="item.done" (click)="editItem(item, 'itemTitle' + i)">
+              <span>{{ item.title }}</span>
+            </div>
+          </div>
+          <div class="todo-item-commands">
+            <button *ngIf="item.id !== 0" class="btn btn-default btn-xs item-details-button" role="button"
+                    title="Item Details..." (click)="showItemDetailsModal(item)">Details...</button>
+          </div>
+        </div>
+      </li>
+      <li class="list-group-item" id="add-item-row">
+        <button id="addItemButton" class="btn btn-default" (click)="addItem()">Add Item...</button>
+      </li>
+    </ul>
+  </div>
+</div>
+
+<!-- New list modal -->
+<div id="newListModal" *ngIf="newListModalOpen">
+  <div class="modal-backdrop show"></div>
+  <div class="modal d-block" role="dialog" tabindex="-1">
+    <div class="modal-dialog">
+      <div class="modal-content">
+        <div class="modal-header">
+          <h5 class="modal-title">New List</h5>
+          <button type="button" class="btn-close" aria-label="Close" (click)="newListCancelled()"></button>
+        </div>
+        <div class="modal-body">
+          <div class="form-group">
+            <label class="form-label" for="title">Title</label>
+            <input type="text" class="form-control" id="title" placeholder="List name..." maxlength="200"
+                   [class.is-invalid]="newListEditor.error" [(ngModel)]="newListEditor.title" (keyup.enter)="addList()" />
+            <div class="invalid-feedback" id="newListError" *ngIf="newListEditor.error">{{ newListEditor.error }}</div>
+          </div>
+        </div>
+        <div class="modal-footer clearfix">
+          <div class="float-end">
+            <button class="btn btn-default" (click)="newListCancelled()">Cancel</button>
+            <button id="addListSubmit" class="btn btn-primary" (click)="addList()">Create</button>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- List options modal -->
+<div id="listOptionsModal" *ngIf="listOptionsModalOpen">
+  <div class="modal-backdrop show"></div>
+  <div class="modal d-block" role="dialog" tabindex="-1">
+    <div class="modal-dialog">
+      <div class="modal-content">
+        <div class="modal-header">
+          <h5 class="modal-title">List Options</h5>
+          <button type="button" class="btn-close" aria-label="Close" (click)="listOptionsCancelled()"></button>
+        </div>
+        <div class="modal-body">
+          <div class="form-group">
+            <label class="form-label" for="inputListTitle">Title</label>
+            <input type="text" class="form-control" id="inputListTitle" placeholder="List name..." maxlength="200"
+                   [class.is-invalid]="listOptionsEditor.error" [(ngModel)]="listOptionsEditor.title" (keyup.enter)="updateListOptions()" />
+            <div class="invalid-feedback" id="listOptionsError" *ngIf="listOptionsEditor.error">{{ listOptionsEditor.error }}</div>
+          </div>
+        </div>
+        <div class="modal-footer">
+          <div class="clearfix">
+            <div class="float-start">
+              <button id="deleteListButton" class="btn btn-default text-danger" (click)="confirmDeleteList()">Delete</button>
+            </div>
+            <div class="float-end">
+              <button class="btn btn-default" (click)="listOptionsCancelled()">Cancel</button>
+              <button id="updateListButton" class="btn btn-primary" (click)="updateListOptions()">Update</button>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- Delete list modal -->
+<div id="deleteListModal" *ngIf="deleteListModalOpen">
+  <div class="modal-backdrop show"></div>
+  <div class="modal d-block" role="dialog" tabindex="-1">
+    <div class="modal-dialog">
+      <div class="modal-content">
+        <div class="modal-header">
+          <h5 class="modal-title">Delete "<span id="deleteListTitle">{{ selectedList?.title }}</span>"?</h5>
+        </div>
+        <div class="modal-body">
+          <p>All items will be permanently deleted.</p>
+        </div>
+        <div class="modal-footer clearfix">
+          <div class="float-end">
+            <button id="deleteListCancel" class="btn btn-default" (click)="deleteListCancelled()">Cancel</button>
+            <button id="deleteListConfirm" class="btn btn-danger" (click)="deleteListConfirmed()">Delete</button>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- Item details modal -->
+<div id="itemDetailsModal" *ngIf="itemDetailsModalOpen">
+  <div class="modal-backdrop show"></div>
+  <div class="modal d-block" role="dialog" tabindex="-1">
+    <div class="modal-dialog">
+      <div class="modal-content">
+        <div class="modal-header">
+          <h5 class="modal-title">Item Details</h5>
+          <button type="button" class="btn-close" aria-label="Close" (click)="itemDetailsCancelled()"></button>
+        </div>
+        <div class="modal-body">
+          <div class="form-group">
+            <label class="form-label" for="priority">Priority</label>
+            <select class="form-select" id="priority" [(ngModel)]="itemDetailsEditor.priority">
+              <option *ngFor="let level of vm?.priorityLevels ?? []" [ngValue]="level.value">{{ level.name }}</option>
+            </select>
+          </div>
+          <div class="form-group">
+            <label class="form-label" for="note">Note</label>
+            <textarea id="note" class="form-control" rows="3" [(ngModel)]="itemDetailsEditor.note"></textarea>
+          </div>
+        </div>
+        <div class="modal-footer">
+          <div class="clearfix">
+            <div class="float-start">
+              <button id="deleteItemButton" class="btn btn-default text-danger" (click)="deleteItemFromDetails()">Delete</button>
+            </div>
+            <div class="float-end">
+              <button class="btn btn-default" (click)="itemDetailsCancelled()">Cancel</button>
+              <button id="updateItemDetailsButton" class="btn btn-primary" (click)="updateItemDetails()">Update</button>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
 </div>
