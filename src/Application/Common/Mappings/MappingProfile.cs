@@ -5,9 +5,13 @@ namespace CleanArchitecture.Application.Common.Mappings;
 
 public class MappingProfile : Profile
 {
-    public MappingProfile()
+    public MappingProfile() : this(Assembly.GetExecutingAssembly())
     {
-        ApplyMappingsFromAssembly(Assembly.GetExecutingAssembly());
+    }
+
+    public MappingProfile(Assembly assembly)
+    {
+        ApplyMappingsFromAssembly(assembly);
     }
 
     private void ApplyMappingsFromAssembly(Assembly assembly)
@@ -18,7 +22,7 @@ public class MappingProfile : Profile
 
         bool HasInterface(Type t) => t.IsGenericType && t.GetGenericTypeDefinition() == mapFromType;
         
-        var types = assembly.GetExportedTypes().Where(t => t.GetInterfaces().Any(HasInterface)).ToList();
+        var types = assembly.GetExportedTypes().Where(t => !t.IsAbstract && !t.ContainsGenericParameters && t.GetInterfaces().Any(HasInterface)).ToList();
         
         var argumentTypes = new Type[] { typeof(Profile) };
 
