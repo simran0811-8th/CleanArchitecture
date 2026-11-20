@@ -18,12 +18,18 @@ namespace CleanArchitecture.Application.Common.Behaviours
             _validators = validators;
         }
 
-        public Task<TResponse> Handle(TRequest request, CancellationToken cancellationToken, RequestHandlerDelegate<TResponse> next)
+        public async Task<TResponse> Handle(TRequest request, CancellationToken cancellationToken, RequestHandlerDelegate<TResponse> next)
         {
             var context = new ValidationContext(request);
 
-            var failures = _validators
-                .Select(v => v.Validate(context))
+            // Validators run one after another: they may share a scoped DbContext.
+            var results = new List<FluentValidation.Results.ValidationResult>();
+            foreach (var v in _validators)
+            {
+                results.Add(await v.ValidateAsync(context, cancellationToken));
+            }
+
+            var failures = results
                 .SelectMany(result => result.Errors)
                 .Where(f => f != null)
                 .ToList();
@@ -33,7 +39,7 @@ namespace CleanArchitecture.Application.Common.Behaviours
                 throw new ValidationException(failures);
             }
 
-            return next();
+            return await next();
         }
     }
 }
