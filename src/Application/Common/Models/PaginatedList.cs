@@ -21,7 +21,7 @@ namespace CleanArchitecture.Application.Common.Models
             Items = items;
         }
 
-        public bool HasPreviousPage => PageIndex > 1;
+        public bool HasPreviousPage => PageIndex > 1 && PageIndex <= TotalPages;
 
         public bool HasNextPage => PageIndex < TotalPages;
 
